@@ -1,26 +1,46 @@
 function New-EPDSCAzureGuestConfigurationPolicyPackage
 {
     [CmdletBinding()]
-    param()
-
-    $ResourceGroupName     = Read-Host "Resource Group Name"
-    $ResourceGroupLocation = Read-Host "Location"
-    $storageContainerName  = Read-Host "Storage Container Name"
-    $storageAccountName    = Read-Host "Storage Account Name"
-    $storageSKUName        = Read-Host "Storage SKU Name"
-
-    if ([System.String]::IsNullOrEmpty($storageSKUName))
-    {
-        $storageSKUName = "Standard_LRS"
-    }
-
-    if ([System.String]::IsNullOrEmpty($ResourceGroupLocation))
-    {
-        $storageSKUName = "eastus"
-    }
+    param
+    (
+        [Parameter(Mandatory = $true,
+                   HelpMessage = '[string] Resource Group Name')]
+        [ValidateNotNullOrEmpty()]
+        [string]$ResourceGroupName,
+        [Parameter(Mandatory = $false,
+                   HelpMessage = '[string] Location')]
+        [string]$ResourceGroupLocation = 'eastus',
+        [Parameter(Mandatory = $true,
+                   HelpMessage = '[string] Storage Container Name')]
+        [ValidateNotNullOrEmpty()]
+        [string]$storageContainerName,
+        [Parameter(Mandatory = $true,
+                   HelpMessage = '[string] Storage Account Name')]
+        [ValidateNotNullOrEmpty()]
+        [string]$storageAccountName,
+        [Parameter(Mandatory = $false,
+                   HelpMessage = '[string] Storage SKU Name')]
+        [string]$storageSKUName = 'Standard_LRS'
+    )
 
     Write-Host "Connecting to Azure..." -NoNewLine
     Connect-AzAccount | Out-Null
+    $subscriptions = Get-AzSubscription | Where-Object {$_.State -eq "Enabled"}
+
+    # If there are more than one subscriptions, select which one to deploy to
+    if ($subscriptions.count -gt 1) {
+        $numberedSubscriptions = @()
+        For ($i=0; $i -lt $subscriptions.count; $i++) {
+            $numberedSubscriptions += $subscriptions[$i] | Select-Object @{Name = 'No'; Expression = {$i+1}},Name,Id, TenantId
+        }
+        
+        Write-Host "Select from following subscriptions"
+        $numberedSubscriptions | Format-Table
+
+        $subNumber = Read-Host "Select No"
+        Set-AzContext $numberedSubscriptions[$subNumber-1].Name | Out-Null
+    }
+    
     Write-Host "Done" -ForegroundColor Green
 
     Write-Host "Compiling Configuration into a MOF file..." -NoNewLine
